@@ -1,0 +1,64 @@
+name: Publish
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: sudo apt-get install gcc-10 libmpfr-dev libmpc-dev
+
+      - name: Prepare build environment
+        run: |
+          prefix_name=rx-none-elf-x86_64-linux
+          mkdir $prefix_name
+          echo prefix_name=$prefix_name >> $GITHUB_ENV
+          echo prefix=`pwd`/$prefix_name >> $GITHUB_ENV
+          echo `pwd`/$prefix_name/bin >> $GITHUB_PATH
+
+      - name: Get number of CPU cores
+        uses: SimenB/github-actions-cpu-cores@v1
+        id: cpu-cores
+
+      - name: Build binutils
+        run: |
+          cd binutils-gdb
+          ./configure --prefix=$prefix --target=rx-elf
+          make -j${{ steps.cpu-cores.outputs.count }}
+          make install
+
+      - name: Build gcc
+        run: |
+          cd gcc
+          mkdir build && cd build
+          ../configure --target rx-elf --prefix=$prefix \
+            --enable-languages=c,jit --enable-host-shared \
+            --disable-werror --disable-multilib --disable-libssp \
+            --with-gnu-ld --with-gnu-as
+          make -j${{ steps.cpu-cores.outputs.count }}
+          make install
+
+      - name: Strip binaries
+        run: |
+          for x in `find $prefix/bin $prefix/lib $prefix/libexec -executable`; do
+            strip $x || true
+          done
+
+      - name: Archive output
+        run: |
+          tar -cJvf $prefix_name.tar.xz $prefix_name
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.prefix_name }}
+          path: ${{ env.prefix_name }}.tar.xz
