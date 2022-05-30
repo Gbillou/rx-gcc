@@ -33,7 +33,7 @@ jobs:
       - name: Build binutils
         run: |
           cd binutils-gdb
-          ./configure --prefix=$prefix --target=rx-elf
+          ./configure --prefix=$prefix --target=rx-none-elf
           make -j${{ steps.cpu-cores.outputs.count }}
           make install
 
@@ -41,7 +41,7 @@ jobs:
         run: |
           cd gcc
           mkdir build && cd build
-          ../configure --target rx-elf --prefix=$prefix \
+          ../configure --target rx-none-elf --prefix=$prefix \
             --enable-languages=c,jit --enable-host-shared \
             --disable-werror --disable-multilib --disable-libssp \
             --with-gnu-ld --with-gnu-as
